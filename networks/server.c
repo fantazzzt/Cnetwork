@@ -19,6 +19,8 @@
 
 #define BACKLOG 10 // how many pending connections queue will hold
 
+#define MAXDATASIZE 100 // max number of bytes we can get at once
+
 void sigchld_handler(int s)
 {
   (void)s; // quiet unused variable warning
@@ -53,6 +55,8 @@ int main(void)
   int yes = 1;
   char s[INET6_ADDRSTRLEN];
   int rv;
+  char buf[MAXDATASIZE]; // buffer for incoming client message
+  int numbytes; // number of bytes received from client
 
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
@@ -135,8 +139,24 @@ int main(void)
     if (!fork())
     {                // this is the child process
       close(sockfd); // child doesn't need the listener
-      if (send(new_fd, "Hello, world!", 13, 0) == -1)
+
+      // receive data from client
+      if ((numbytes = recv(new_fd, buf, MAXDATASIZE-1, 0)) == -1) {
+        perror("recv");
+        exit(1);
+      }
+      
+      buf[numbytes] = '\0';
+
+      printf("server: received '%s'\n",buf);
+
+      // add a response to the client's message
+      strcat(buf, " -- received!");
+
+      // send the new message back to the client
+      if (send(new_fd, buf, strlen(buf), 0) == -1)
         perror("send");
+        
       close(new_fd);
       exit(0);
     }
